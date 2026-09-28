@@ -19,7 +19,7 @@ button,.btn{background:#f9a825;color:#000;border:none;padding:10px 16px;border-r
 .small{font-size:12px;opacity:.85;} .seat{background:#0d3b24;border-radius:6px;padding:6px 10px;margin:3px 0;}
 .hr{border-top:1px solid #2c6b4a;margin:12px 0;} .code{font-size:32px;letter-spacing:4px;font-weight:bold;text-align:center;}
 #log{font-size:13px;max-height:110px;overflow-y:auto;background:#0a2e1c;padding:8px;border-radius:6px;}
-#popup{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:#fff59d;color:#000;padding:16px 22px;border-radius:14px;font-size:22px;font-weight:bold;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:99;display:none;text-align:center;max-width:85%;pointer-events:none;}
+#popup{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:#fff59d;color:#000;padding:16px 22px;border-radius:14px;font-size:22px;font-weight:bold;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:99;display:none;text-align:center;max-width:85%;pointer-events:none;white-space:pre-line;}
 </style>
 </head>
 <body>
@@ -79,7 +79,8 @@ const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'blo
 
 let peer=null,isHost=false,conn=null,code='',N=4,humans=[];
 let players=[],leader=0,turn=0,phase='lead',trick=[],leadSuit=null,firstTrick=true,busy=false,over=null,logs=[];
-let canRename=false,evt=null,evtId=0,lastEvt=0,lastTrickLen=0,popTimer=null,actx=null;
+let canRename=false,evt=null,evtId=0,lastEvt=0,lastTrickLen=0,popTimer=null,actx=null,pickStreak=0,discards=[];
+const LOOP_LIMIT=4, LOOP_CARDS=10; // pickups in a row between the last two players, then each gets LOOP_CARDS fresh cards
 const EMOJI=['😂','🤣','😜','🤪','😅','🙈','🤭','😝','🥴','🤡'];
 
 for(let i=2;i<=25;i++){const o=document.createElement('option');o.value=o.text=i;if(i===4)o.selected=true;$('numPlayers').appendChild(o);}
@@ -189,7 +190,7 @@ function startGame(){
   players=shuffle(list);
   deck.forEach((c,i)=>players[i%players.length].hand.push(c));
   leader=players.findIndex(p=>p.hand.some(c=>c.suit==='S'&&c.rank==='A'));
-  turn=leader;phase='lead';trick=[];leadSuit=null;firstTrick=true;busy=false;over=null;logs=[];canRename=true;evt=null;
+  turn=leader;phase='lead';trick=[];leadSuit=null;firstTrick=true;busy=false;over=null;logs=[];canRename=true;evt=null;pickStreak=0;discards=[];
   addLog('Game started / રમત શરૂ થઈ');
   afterTurnSet();
 }
@@ -237,16 +238,54 @@ function play(i,suit,rank){
   if(nx===leader){setTimeout(()=>resolve(false),1200);return;}
   turn=nx; setTimeout(afterTurnSet,1000);
 }
+function topUp(alive){
+  // Give each of the last two players fresh cards from the discard pile, spread across suits (both colours)
+  const stacks={S:[],H:[],C:[],D:[]};
+  shuffle(discards).forEach(c=>stacks[c.suit].push(c));
+  const n=Math.min(LOOP_CARDS,Math.floor(discards.length/2));
+  pickStreak=0;
+  if(n<1){
+    const pool=shuffle(alive.flatMap(pl=>pl.hand));
+    alive.forEach(pl=>{pl.hand=[];});
+    pool.forEach((c,k)=>alive[k%2].hand.push(c));
+    evt.msg+='\n🔀 કાર્ડ ફરી ભળ્યા!'; evt.snd='oops';
+    addLog("<b>Loop detected - cards reshuffled / કાર્ડ ફરી ભળ્યા</b>");
+    return;
+  }
+  const order=['S','H','C','D'];
+  alive.forEach(pl=>{
+    for(let k=0,si=0;k<n&&si<400;si++){
+      const st=stacks[order[si%4]];
+      if(st.length){pl.hand.push(st.pop());k++;}
+    }
+  });
+  discards=[].concat(stacks.S,stacks.H,stacks.C,stacks.D);
+  evt.msg+='\n🎁 દરેકને '+n+' નવા પત્તા!'; evt.snd='oops';
+  addLog("<b>Endless loop! Each of the last two players gets "+n+" fresh cards / દરેકને "+n+" નવા પત્તા</b>");
+}
 function resolve(broke){
   let best=trick[0]; trick.forEach(t=>{if(t.card.suit===leadSuit&&t.card.value>best.card.value)best=t;});
   const w=best.p, breaker=trick[trick.length-1].p;
   canRename=false;
-  if(broke){evt={id:++evtId,name:players[w].name,emo:EMOJI[Math.floor(Math.random()*EMOJI.length)]};players[w].hand.push(...trick.map(t=>t.card));addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');}
-  else addLog('<b>'+nm(w)+' wins the trick / ટ્રીક જીતી</b>');
+  const parts=[]; let snd='ok';
+  if(broke){
+    parts.push(players[w].name+'ને ઠો મળ્યો! '+EMOJI[Math.floor(Math.random()*EMOJI.length)]); snd='oops';
+    players[w].hand.push(...trick.map(t=>t.card));
+    addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');
+  } else {
+    discards.push(...trick.map(t=>t.card));
+    parts.push(players[w].name+'નો હાથ ✋');
+    addLog("<b>"+nm(w)+"'s hand / "+esc(players[w].name)+"નો હાથ</b>");
+  }
   trick=[];leadSuit=null;
-  players.forEach((p,i)=>{if(!p.hand.length&&!p.out){p.out=true;addLog(nm(i)+' is SAFE! / સુરક્ષિત!');}});
-  const alive=players.filter(p=>!p.out);
+  players.forEach((pl,i)=>{
+    if(!pl.hand.length&&!pl.out){pl.out=true;parts.push(pl.name+' છૂટી ગયા! 🎉');addLog('<b>'+nm(i)+' is free! / '+esc(pl.name)+' છૂટી ગયા!</b>');}
+  });
+  evt={id:++evtId,msg:parts.join('\n'),snd};
+  const alive=players.filter(pl=>!pl.out);
   if(alive.length<=1){over=alive[0]?alive[0].name:'-';busy=false;broadcast();return;}
+  if(broke&&alive.length===2)pickStreak++; else pickStreak=0;
+  if(pickStreak>=LOOP_LIMIT)topUp(alive);
   const starter=broke?breaker:w;
   leader=players[starter].out?nextActive(starter):starter; turn=leader; phase='lead';
   if(broke)addLog(nm(leader)+' leads next / આગળનો વારો');
@@ -269,30 +308,33 @@ function render(P,hand,you){
   const tag=i=>'#'+(i+1)+' '+esc(P.players[i].name);
   if(P.trick.length>lastTrickLen)clickSnd();
   lastTrickLen=P.trick.length;
-  if(P.evt&&P.evt.id!==lastEvt){lastEvt=P.evt.id;showPopup(P.evt.name+'ને ઠો મળ્યો! '+P.evt.emo);oopsSnd();}
+  if(P.evt&&P.evt.id!==lastEvt){lastEvt=P.evt.id;showPopup(P.evt.msg);if(P.evt.snd==='oops')oopsSnd(); else clickSnd();}
   $('renameRow').style.display=(P.canRename&&!P.over)?'block':'none';
   if(!$('gameName').dataset.init){$('gameName').value=me.name;$('gameName').dataset.init='1';}
   $('trickArea').innerHTML=P.trick.length?P.trick.map(t=>`<span class="tw"><span class="small">${tag(t.p)}</span><br>${cardHtml(t.card)}</span>`).join(''):'<span class="small">-</span>';
   let lab='';
   if(!P.over){
     lab=myTurn?(P.phase==='lead'?'Your turn to lead! / તમારો વારો (લીડ)!':'Your turn! / તમારો વારો!')
-      :(me.out?'You are SAFE! / તમે સુરક્ષિત છો! &middot; ':'')+'Waiting for '+tag(P.turn)+'... / '+tag(P.turn)+' ની રાહ...';
+      :(me.out?'You are free! / તમે છૂટી ગયા! &middot; ':'')+'Waiting for '+tag(P.turn)+'... / '+tag(P.turn)+' ની રાહ...';
   }
   $('turnLabel').innerHTML=lab;
   if(P.over){
-    $('handArea').innerHTML=`<h2>&#127942; ${esc(P.over)} becomes THO!</h2><div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી</div>
+    $('handArea').innerHTML=`<h2>${['🤡','😅','🙈','😜','🍌'][[...P.over].reduce((a,c)=>a+c.charCodeAt(0),0)%5]} ${esc(P.over)} becomes THO!</h2><div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી<br>Better luck next time! / આવતી વખતે વધુ સારા નસીબ!</div>
       <button onclick="location.href=location.href.split('?')[0]">Play again / ફરીથી રમો</button>`;
   } else {
     const hasLead=hand.some(c=>c.suit===P.leadSuit);
-    const sorted=[...hand].sort((a,b)=>SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)||b.value-a.value);
-    $('handArea').innerHTML=sorted.map(c=>{
-      const legal=myTurn&&(P.phase==='lead'?(!P.firstTrick||(c.suit==='S'&&c.rank==='A')):(!hasLead||c.suit===P.leadSuit));
-      return cardHtml(c,legal?'ok':'no');
+    $('handArea').innerHTML=['S','H','C','D'].map(su=>{
+      const row=hand.filter(c=>c.suit===su).sort((a,b)=>b.value-a.value);
+      if(!row.length)return '';
+      return '<div>'+row.map(c=>{
+        const legal=myTurn&&(P.phase==='lead'?(!P.firstTrick||(c.suit==='S'&&c.rank==='A')):(!hasLead||c.suit===P.leadSuit));
+        return cardHtml(c,legal?'ok':'no');
+      }).join('')+'</div>';
     }).join('');
   }
   $('playerList').innerHTML=P.players.map((p,i)=>
     `<div class="row"><span>#${i+1} ${esc(p.name)}${p.bot?' (Bot)':''}${i===you?' (you)':''}${i===P.turn&&!P.over?' &#9654;':''}</span>
-     <span>${p.out?'<b>SAFE / સુરક્ષિત</b>':p.n+' cards'}</span></div>`).join('');
+     <span>${p.out?'<b>FREE / છૂટી ગયા</b>':p.n+' cards'}</span></div>`).join('');
   $('log').innerHTML=P.log.map(l=>`<div>${l}</div>`).join('');
 }
 </script>
