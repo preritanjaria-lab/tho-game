@@ -19,9 +19,11 @@ button,.btn{background:#f9a825;color:#000;border:none;padding:10px 16px;border-r
 .small{font-size:12px;opacity:.85;} .seat{background:#0d3b24;border-radius:6px;padding:6px 10px;margin:3px 0;}
 .hr{border-top:1px solid #2c6b4a;margin:12px 0;} .code{font-size:32px;letter-spacing:4px;font-weight:bold;text-align:center;}
 #log{font-size:13px;max-height:110px;overflow-y:auto;background:#0a2e1c;padding:8px;border-radius:6px;}
+#popup{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:#fff59d;color:#000;padding:16px 22px;border-radius:14px;font-size:22px;font-weight:bold;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:99;display:none;text-align:center;max-width:85%;pointer-events:none;}
 </style>
 </head>
 <body>
+<div id="popup"></div>
 <h1>&#127183; THO</h1>
 <div class="sub">Multiplayer card game &middot; મલ્ટિપ્લેયર પત્તાની રમત</div>
 
@@ -48,6 +50,8 @@ button,.btn{background:#f9a825;color:#000;border:none;padding:10px 16px;border-r
   <div class="hr"></div>
   <b>Players / ખેલાડીઓ</b>
   <div id="lobbyList"></div>
+  <div class="small" style="margin-top:8px;">Change your name / તમારું નામ બદલો</div>
+  <input id="lobbyName" maxlength="14" style="width:60%;"> <button onclick="renameMe('lobbyName')">Update / બદલો</button>
   <button id="startBtn" onclick="startGame()" style="display:none;">Start Game / રમત શરૂ કરો</button>
   <div class="small" id="waitMsg" style="display:none;">Waiting for the host to start... / હોસ્ટ રમત શરૂ કરે તેની રાહ...</div>
 </div>
@@ -59,7 +63,8 @@ button,.btn{background:#f9a825;color:#000;border:none;padding:10px 16px;border-r
   </div>
   <div class="row"><b id="turnLabel"></b></div>
   <div id="handArea" style="text-align:center;"></div>
-  <div class="panel"><div class="small">Players / ખેલાડીઓ</div><div id="playerList"></div></div>
+  <div id="renameRow" style="display:none;margin:6px 0;text-align:center;"><input id="gameName" maxlength="14" style="width:55%;"> <button onclick="renameMe('gameName')">Update name / નામ બદલો</button><div class="small">Only until the first round ends / પહેલો રાઉન્ડ પૂરો થાય ત્યાં સુધી</div></div>
+  <div class="panel"><div class="small">Players in turn order (1 &rarr; 2 &rarr; 3 ...) / ખેલાડીઓ (વારાનો ક્રમ)</div><div id="playerList"></div></div>
   <div id="log"></div>
 </div>
 
@@ -74,6 +79,8 @@ const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'blo
 
 let peer=null,isHost=false,conn=null,code='',N=4,humans=[];
 let players=[],leader=0,turn=0,phase='lead',trick=[],leadSuit=null,firstTrick=true,busy=false,over=null,logs=[];
+let canRename=false,evt=null,evtId=0,lastEvt=0,lastTrickLen=0,popTimer=null,actx=null;
+const EMOJI=['😂','🤣','😜','🤪','😅','🙈','🤭','😝','🥴','🤡'];
 
 for(let i=2;i<=25;i++){const o=document.createElement('option');o.value=o.text=i;if(i===4)o.selected=true;$('numPlayers').appendChild(o);}
 const q=new URLSearchParams(location.search).get('room'); if(q)$('roomCode').value=q.toUpperCase();
@@ -105,7 +112,7 @@ function joinRoom(){
   peer.on('error',e=>alert('Could not join / જોડાઈ શકાયું નહીં ('+e.type+')'));
 }
 function showLobby(){
-  show('lobby'); $('codeBig').innerText=code;
+  show('lobby'); $('lobbyName').value=myName(); $('codeBig').innerText=code;
   const link=location.href.split('?')[0].split('#')[0]+'?room='+code;
   $('linkTxt').innerText=link;
   $('waBtn').href='https://wa.me/?text='+encodeURIComponent('Join my THO card game! / મારી THO રમતમાં જોડાઓ!\nRoom code: '+code+'\n'+link);
@@ -134,8 +141,32 @@ function hostData(c,d){
     humans.push({name:String(d.name||'Player').slice(0,14),conn:c}); lobbyBroadcast();
   } else if(d.t==='play'){
     const i=players.findIndex(p=>p.conn===c); if(i>=0)play(i,d.suit,d.rank);
+  } else if(d.t==='rename'){ hostRename(c,d.name); }
+}
+function hostRename(c,v){
+  v=String(v||'').trim().slice(0,14); if(!v)return;
+  if(!players.length){
+    const h=humans.find(h=>h.conn===c); if(h){h.name=v;lobbyBroadcast();}
+  } else if(canRename){
+    const i=c?players.findIndex(p=>p.conn===c):players.findIndex(p=>p.host);
+    if(i>=0){const old=players[i].name;players[i].name=v;addLog(esc(old)+' is now '+esc(v)+' / નામ બદલ્યું');broadcast();}
   }
 }
+function renameMe(id){
+  const v=$(id).value.trim().slice(0,14); if(!v)return;
+  if(isHost)hostRename(null,v); else if(conn)conn.send({t:'rename',name:v});
+}
+function audio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();}catch(e){}return actx;}
+function tone(f,dur,type,vol,delay){
+  const a=audio(); if(!a)return; const t=a.currentTime+(delay||0);
+  const o=a.createOscillator(),g=a.createGain(); o.type=type||'square'; o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(vol||.12,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+dur+.02);
+}
+const clickSnd=()=>tone(1000,.05,'square',.12);
+const oopsSnd=()=>{tone(400,.15,'sawtooth',.12,0);tone(300,.22,'sawtooth',.12,.15);};
+function showPopup(txt){const el=$('popup');el.textContent=txt;el.style.display='block';clearTimeout(popTimer);popTimer=setTimeout(()=>{el.style.display='none';},2600);}
+document.addEventListener('click',()=>audio());
 function hostLeft(c){
   if(!players.length){humans=humans.filter(h=>h.conn!==c);lobbyBroadcast();return;}
   const i=players.findIndex(p=>p.conn===c); if(i<0)return;
@@ -145,7 +176,7 @@ function hostLeft(c){
 }
 
 /* ---------- game engine (host only) ---------- */
-const nm=i=>esc(players[i].name);
+const nm=i=>'#'+(i+1)+' '+esc(players[i].name);
 const label=c=>c.rank+SYM[c.suit];
 function addLog(m){logs.unshift(m);logs=logs.slice(0,8);}
 function nextActive(from){const n=players.length;for(let k=1;k<=n;k++){const i=(from+k)%n;if(!players[i].out)return i;}return from;}
@@ -158,13 +189,13 @@ function startGame(){
   players=shuffle(list);
   deck.forEach((c,i)=>players[i%players.length].hand.push(c));
   leader=players.findIndex(p=>p.hand.some(c=>c.suit==='S'&&c.rank==='A'));
-  turn=leader;phase='lead';trick=[];leadSuit=null;firstTrick=true;busy=false;over=null;logs=[];
+  turn=leader;phase='lead';trick=[];leadSuit=null;firstTrick=true;busy=false;over=null;logs=[];canRename=true;evt=null;
   addLog('Game started / રમત શરૂ થઈ');
   afterTurnSet();
 }
 function pubState(){
   return{players:players.map(p=>({name:p.name,bot:p.isBot,out:p.out,n:p.hand.length})),
-    trick:trick.map(t=>({p:t.p,card:t.card})),turn,phase,leadSuit,firstTrick,busy,over,leader,log:logs};
+    trick:trick.map(t=>({p:t.p,card:t.card})),turn,phase,leadSuit,firstTrick,busy,over,leader,canRename,evt,log:logs};
 }
 function broadcast(){
   const P=pubState();
@@ -208,14 +239,17 @@ function play(i,suit,rank){
 }
 function resolve(broke){
   let best=trick[0]; trick.forEach(t=>{if(t.card.suit===leadSuit&&t.card.value>best.card.value)best=t;});
-  const w=best.p;
-  if(broke){players[w].hand.push(...trick.map(t=>t.card));addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');}
+  const w=best.p, breaker=trick[trick.length-1].p;
+  canRename=false;
+  if(broke){evt={id:++evtId,name:players[w].name,emo:EMOJI[Math.floor(Math.random()*EMOJI.length)]};players[w].hand.push(...trick.map(t=>t.card));addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');}
   else addLog('<b>'+nm(w)+' wins the trick / ટ્રીક જીતી</b>');
   trick=[];leadSuit=null;
   players.forEach((p,i)=>{if(!p.hand.length&&!p.out){p.out=true;addLog(nm(i)+' is SAFE! / સુરક્ષિત!');}});
   const alive=players.filter(p=>!p.out);
   if(alive.length<=1){over=alive[0]?alive[0].name:'-';busy=false;broadcast();return;}
-  leader=players[w].out?nextActive(w):w; turn=leader; phase='lead';
+  const starter=broke?breaker:w;
+  leader=players[starter].out?nextActive(starter):starter; turn=leader; phase='lead';
+  if(broke)addLog(nm(leader)+' leads next / આગળનો વારો');
   broadcast(); setTimeout(afterTurnSet,1500);
 }
 
@@ -232,11 +266,17 @@ function sendPlay(s,r){
 function render(P,hand,you){
   show('game');
   const me=P.players[you], myTurn=P.turn===you&&!P.busy&&!P.over;
-  $('trickArea').innerHTML=P.trick.length?P.trick.map(t=>`<span class="tw"><span class="small">${esc(P.players[t.p].name)}</span><br>${cardHtml(t.card)}</span>`).join(''):'<span class="small">-</span>';
+  const tag=i=>'#'+(i+1)+' '+esc(P.players[i].name);
+  if(P.trick.length>lastTrickLen)clickSnd();
+  lastTrickLen=P.trick.length;
+  if(P.evt&&P.evt.id!==lastEvt){lastEvt=P.evt.id;showPopup(P.evt.name+'ને ઠો મળ્યો! '+P.evt.emo);oopsSnd();}
+  $('renameRow').style.display=(P.canRename&&!P.over)?'block':'none';
+  if(!$('gameName').dataset.init){$('gameName').value=me.name;$('gameName').dataset.init='1';}
+  $('trickArea').innerHTML=P.trick.length?P.trick.map(t=>`<span class="tw"><span class="small">${tag(t.p)}</span><br>${cardHtml(t.card)}</span>`).join(''):'<span class="small">-</span>';
   let lab='';
   if(!P.over){
     lab=myTurn?(P.phase==='lead'?'Your turn to lead! / તમારો વારો (લીડ)!':'Your turn! / તમારો વારો!')
-      :(me.out?'You are SAFE! / તમે સુરક્ષિત છો! &middot; ':'')+'Waiting for '+esc(P.players[P.turn].name)+'... / '+esc(P.players[P.turn].name)+' ની રાહ...';
+      :(me.out?'You are SAFE! / તમે સુરક્ષિત છો! &middot; ':'')+'Waiting for '+tag(P.turn)+'... / '+tag(P.turn)+' ની રાહ...';
   }
   $('turnLabel').innerHTML=lab;
   if(P.over){
@@ -251,7 +291,7 @@ function render(P,hand,you){
     }).join('');
   }
   $('playerList').innerHTML=P.players.map((p,i)=>
-    `<div class="row"><span>${esc(p.name)}${p.bot?' (Bot)':''}${i===you?' (you)':''}${i===P.turn&&!P.over?' &#9654;':''}</span>
+    `<div class="row"><span>#${i+1} ${esc(p.name)}${p.bot?' (Bot)':''}${i===you?' (you)':''}${i===P.turn&&!P.over?' &#9654;':''}</span>
      <span>${p.out?'<b>SAFE / સુરક્ષિત</b>':p.n+' cards'}</span></div>`).join('');
   $('log').innerHTML=P.log.map(l=>`<div>${l}</div>`).join('');
 }
