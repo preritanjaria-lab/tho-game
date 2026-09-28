@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THO - Multiplayer</title>
+<style>
+body{font-family:Arial,sans-serif;background:#0d3b24;color:#fff;margin:0;padding:14px;}
+h1{text-align:center;margin:6px 0 0;} .sub{text-align:center;font-size:13px;opacity:.85;margin:2px 0 12px;}
+.panel{background:#124d31;border-radius:10px;padding:14px;margin:10px auto;max-width:600px;}
+.card{width:44px;height:62px;border-radius:6px;background:#fff;color:#000;border:1px solid #999;display:inline-flex;flex-direction:column;justify-content:space-between;align-items:center;padding:3px 0;margin:3px;font-weight:bold;cursor:pointer;box-shadow:1px 1px 3px rgba(0,0,0,.4);vertical-align:top;}
+.card .rk{font-size:12px;line-height:1;} .card .sb{font-size:20px;line-height:1;}
+.card.red{color:#c62828;} .card.disabled{opacity:.35;cursor:not-allowed;} .card.plain{cursor:default;}
+.tw{display:inline-block;text-align:center;margin:0 2px;}
+input,select{padding:8px;border-radius:6px;border:none;margin:4px 0;}
+button,.btn{background:#f9a825;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;margin:4px 0;text-decoration:none;display:inline-block;}
+.btn.wa{background:#25d366;}
+.row{display:flex;justify-content:space-between;align-items:center;margin:4px 0;font-size:14px;}
+.small{font-size:12px;opacity:.85;} .seat{background:#0d3b24;border-radius:6px;padding:6px 10px;margin:3px 0;}
+.hr{border-top:1px solid #2c6b4a;margin:12px 0;} .code{font-size:32px;letter-spacing:4px;font-weight:bold;text-align:center;}
+#log{font-size:13px;max-height:110px;overflow-y:auto;background:#0a2e1c;padding:8px;border-radius:6px;}
+</style>
+</head>
+<body>
+<h1>&#127183; THO</h1>
+<div class="sub">Multiplayer card game &middot; મલ્ટિપ્લેયર પત્તાની રમત</div>
+
+<div class="panel" id="home">
+  <input id="myName" maxlength="14" placeholder="Your name / તમારું નામ" style="width:90%;">
+  <div class="hr"></div>
+  <b>Create room / રૂમ બનાવો</b>
+  <div class="row"><span>Total players / કુલ ખેલાડીઓ</span><select id="numPlayers"></select></div>
+  <button onclick="createRoom()">Create Room / રૂમ બનાવો</button>
+  <div class="hr"></div>
+  <b>Join room / રૂમમાં જોડાઓ</b><br>
+  <input id="roomCode" maxlength="8" placeholder="Room code / કોડ" style="text-transform:uppercase;">
+  <button onclick="joinRoom()">Join / જોડાઓ</button>
+  <div class="small">Seats nobody joins are filled by bots. / જે બેઠકો ખાલી રહે તે બોટથી ભરાશે.</div>
+</div>
+
+<div class="panel" id="lobby" style="display:none;">
+  <div class="small" style="text-align:center;">Room code / રૂમ કોડ</div>
+  <div class="code" id="codeBig"></div>
+  <div style="text-align:center;">
+    <a class="btn wa" id="waBtn" target="_blank">&#128242; Share on WhatsApp / વોટ્સએપ પર શેર કરો</a>
+    <div class="small" id="linkTxt" style="word-break:break-all;"></div>
+  </div>
+  <div class="hr"></div>
+  <b>Players / ખેલાડીઓ</b>
+  <div id="lobbyList"></div>
+  <button id="startBtn" onclick="startGame()" style="display:none;">Start Game / રમત શરૂ કરો</button>
+  <div class="small" id="waitMsg" style="display:none;">Waiting for the host to start... / હોસ્ટ રમત શરૂ કરે તેની રાહ...</div>
+</div>
+
+<div class="panel" id="game" style="display:none;">
+  <div class="panel" style="margin:0 0 10px;">
+    <div class="small">Current trick / ચાલુ ટ્રીક</div>
+    <div id="trickArea"></div>
+  </div>
+  <div class="row"><b id="turnLabel"></b></div>
+  <div id="handArea" style="text-align:center;"></div>
+  <div class="panel"><div class="small">Players / ખેલાડીઓ</div><div id="playerList"></div></div>
+  <div id="log"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+const SUITS=['S','H','D','C'], SYM={S:'&spades;',H:'&hearts;',D:'&diams;',C:'&clubs;'};
+const RANKS=[['A',14],['K',13],['Q',12],['J',11],['10',10],['9',9],['8',8],['7',7],['6',6],['5',5],['4',4],['3',3],['2',2]];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'block':'none');
+
+let peer=null,isHost=false,conn=null,code='',N=4,humans=[];
+let players=[],leader=0,turn=0,phase='lead',trick=[],leadSuit=null,firstTrick=true,busy=false,over=null,logs=[];
+
+for(let i=2;i<=25;i++){const o=document.createElement('option');o.value=o.text=i;if(i===4)o.selected=true;$('numPlayers').appendChild(o);}
+const q=new URLSearchParams(location.search).get('room'); if(q)$('roomCode').value=q.toUpperCase();
+const myName=()=>($('myName').value.trim()||'Player').slice(0,14);
+
+/* ---------- lobby / networking ---------- */
+function createRoom(){
+  isHost=true; N=+$('numPlayers').value;
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen').catch(()=>{});}catch(e){}
+  mkHost();
+}
+function mkHost(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  code=Array.from({length:5},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  peer=new Peer('tho26-'+code);
+  peer.on('open',()=>{humans=[{name:myName(),conn:null}];showLobby();lobbyBroadcast();});
+  peer.on('error',e=>{ if(e.type==='unavailable-id')mkHost(); else alert('Connection problem / કનેક્શન સમસ્યા: '+e.type); });
+  peer.on('connection',c=>{c.on('data',d=>hostData(c,d));c.on('close',()=>hostLeft(c));});
+}
+function joinRoom(){
+  code=$('roomCode').value.trim().toUpperCase(); if(!code)return;
+  isHost=false; peer=new Peer();
+  peer.on('open',()=>{
+    conn=peer.connect('tho26-'+code,{reliable:true});
+    conn.on('open',()=>{conn.send({t:'join',name:myName()});showLobby();});
+    conn.on('data',guestData);
+    conn.on('close',()=>alert('Disconnected from host / હોસ્ટ સાથે કનેક્શન તૂટ્યું'));
+  });
+  peer.on('error',e=>alert('Could not join / જોડાઈ શકાયું નહીં ('+e.type+')'));
+}
+function showLobby(){
+  show('lobby'); $('codeBig').innerText=code;
+  const link=location.href.split('?')[0].split('#')[0]+'?room='+code;
+  $('linkTxt').innerText=link;
+  $('waBtn').href='https://wa.me/?text='+encodeURIComponent('Join my THO card game! / મારી THO રમતમાં જોડાઓ!\nRoom code: '+code+'\n'+link);
+  $('startBtn').style.display=isHost?'inline-block':'none';
+  $('waitMsg').style.display=isHost?'none':'block';
+}
+function renderLobby(names,n){
+  $('lobbyList').innerHTML=names.map((x,i)=>`<div class="seat">${esc(x)}${i===0?' (host)':''}</div>`).join('')+
+   `<div class="small">${names.length}/${n} joined &middot; ${n-names.length} bot(s) fill the rest / બાકીની બેઠકો બોટથી ભરાશે</div>`;
+}
+function lobbyBroadcast(){
+  const names=humans.map(h=>h.name);
+  humans.forEach(h=>h.conn&&h.conn.send({t:'lobby',names,n:N}));
+  renderLobby(names,N);
+}
+function guestData(d){
+  if(d.t==='lobby')renderLobby(d.names,d.n);
+  else if(d.t==='state')render(d.pub,d.hand,d.you);
+  else if(d.t==='err'){alert(d.m);location.href=location.href.split('?')[0];}
+}
+function hostData(c,d){
+  if(d.t==='join'){
+    if(players.length){c.send({t:'err',m:'Game already started / રમત શરૂ થઈ ગઈ છે'});return;}
+    if(humans.length>=N){c.send({t:'err',m:'Room is full / રૂમ ભરાઈ ગયો છે'});return;}
+    if(humans.find(h=>h.conn===c))return;
+    humans.push({name:String(d.name||'Player').slice(0,14),conn:c}); lobbyBroadcast();
+  } else if(d.t==='play'){
+    const i=players.findIndex(p=>p.conn===c); if(i>=0)play(i,d.suit,d.rank);
+  }
+}
+function hostLeft(c){
+  if(!players.length){humans=humans.filter(h=>h.conn!==c);lobbyBroadcast();return;}
+  const i=players.findIndex(p=>p.conn===c); if(i<0)return;
+  players[i].conn=null; players[i].isBot=true;
+  addLog(nm(i)+' left - a bot takes over / બોટ સંભાળશે');
+  if(!busy&&!over&&turn===i)setTimeout(botMove,1500); else broadcast();
+}
+
+/* ---------- game engine (host only) ---------- */
+const nm=i=>esc(players[i].name);
+const label=c=>c.rank+SYM[c.suit];
+function addLog(m){logs.unshift(m);logs=logs.slice(0,8);}
+function nextActive(from){const n=players.length;for(let k=1;k<=n;k++){const i=(from+k)%n;if(!players[i].out)return i;}return from;}
+
+function startGame(){
+  const deck=[]; SUITS.forEach(s=>RANKS.forEach(r=>deck.push({suit:s,rank:r[0],value:r[1]})));
+  shuffle(deck);
+  const list=humans.map(h=>({name:h.name,isBot:false,conn:h.conn,host:!h.conn,hand:[],out:false}));
+  for(let i=humans.length;i<N;i++)list.push({name:'Bot '+(i-humans.length+1),isBot:true,conn:null,host:false,hand:[],out:false});
+  players=shuffle(list);
+  deck.forEach((c,i)=>players[i%players.length].hand.push(c));
+  leader=players.findIndex(p=>p.hand.some(c=>c.suit==='S'&&c.rank==='A'));
+  turn=leader;phase='lead';trick=[];leadSuit=null;firstTrick=true;busy=false;over=null;logs=[];
+  addLog('Game started / રમત શરૂ થઈ');
+  afterTurnSet();
+}
+function pubState(){
+  return{players:players.map(p=>({name:p.name,bot:p.isBot,out:p.out,n:p.hand.length})),
+    trick:trick.map(t=>({p:t.p,card:t.card})),turn,phase,leadSuit,firstTrick,busy,over,leader,log:logs};
+}
+function broadcast(){
+  const P=pubState();
+  players.forEach((p,i)=>{
+    if(p.host)render(P,p.hand,i);
+    else if(p.conn)p.conn.send({t:'state',pub:P,hand:p.hand,you:i});
+  });
+}
+function afterTurnSet(){
+  busy=false; broadcast();
+  if(!over&&players[turn].isBot)setTimeout(botMove,1700);
+}
+function botMove(){
+  if(over||busy||!players[turn].isBot)return;
+  const p=players[turn]; let card;
+  if(phase==='lead'){
+    card=firstTrick?p.hand.find(c=>c.suit==='S'&&c.rank==='A'):p.hand.reduce((a,b)=>a.value<b.value?a:b);
+  } else {
+    const suited=p.hand.filter(c=>c.suit===leadSuit);
+    card=suited.length?suited.reduce((a,b)=>a.value<b.value?a:b):p.hand.reduce((a,b)=>a.value>b.value?a:b);
+  }
+  play(turn,card.suit,card.rank);
+}
+function play(i,suit,rank){
+  if(over||busy||i!==turn)return;
+  const p=players[i], card=p.hand.find(c=>c.suit===suit&&c.rank===rank); if(!card)return;
+  if(phase==='lead'){ if(firstTrick&&!(suit==='S'&&rank==='A'))return; }
+  else if(suit!==leadSuit&&p.hand.some(c=>c.suit===leadSuit))return;
+  p.hand=p.hand.filter(c=>c!==card);
+  busy=true;
+  if(phase==='lead'){
+    trick=[{p:i,card}];leadSuit=suit;firstTrick=false;phase='follow';
+    addLog(nm(i)+' leads '+label(card));
+    turn=nextActive(i); broadcast(); setTimeout(afterTurnSet,1000); return;
+  }
+  trick.push({p:i,card}); addLog(nm(i)+' plays '+label(card)); broadcast();
+  if(suit!==leadSuit){setTimeout(()=>resolve(true),1200);return;}
+  const nx=nextActive(i);
+  if(nx===leader){setTimeout(()=>resolve(false),1200);return;}
+  turn=nx; setTimeout(afterTurnSet,1000);
+}
+function resolve(broke){
+  let best=trick[0]; trick.forEach(t=>{if(t.card.suit===leadSuit&&t.card.value>best.card.value)best=t;});
+  const w=best.p;
+  if(broke){players[w].hand.push(...trick.map(t=>t.card));addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');}
+  else addLog('<b>'+nm(w)+' wins the trick / ટ્રીક જીતી</b>');
+  trick=[];leadSuit=null;
+  players.forEach((p,i)=>{if(!p.hand.length&&!p.out){p.out=true;addLog(nm(i)+' is SAFE! / સુરક્ષિત!');}});
+  const alive=players.filter(p=>!p.out);
+  if(alive.length<=1){over=alive[0]?alive[0].name:'-';busy=false;broadcast();return;}
+  leader=players[w].out?nextActive(w):w; turn=leader; phase='lead';
+  broadcast(); setTimeout(afterTurnSet,1500);
+}
+
+/* ---------- rendering (host and guests) ---------- */
+function cardHtml(c,mode){
+  const red=(c.suit==='H'||c.suit==='D')?' red':'';
+  const cls='card'+red+(mode==='no'?' disabled':'')+(!mode?' plain':'');
+  const click=mode==='ok'?` onclick="sendPlay('${c.suit}','${c.rank}')"`:'';
+  return `<span class="${cls}"${click}><span class="rk">${c.rank}</span><span class="sb">${SYM[c.suit]}</span><span class="rk">${c.rank}</span></span>`;
+}
+function sendPlay(s,r){
+  if(isHost)play(players.findIndex(p=>p.host),s,r); else if(conn)conn.send({t:'play',suit:s,rank:r});
+}
+function render(P,hand,you){
+  show('game');
+  const me=P.players[you], myTurn=P.turn===you&&!P.busy&&!P.over;
+  $('trickArea').innerHTML=P.trick.length?P.trick.map(t=>`<span class="tw"><span class="small">${esc(P.players[t.p].name)}</span><br>${cardHtml(t.card)}</span>`).join(''):'<span class="small">-</span>';
+  let lab='';
+  if(!P.over){
+    lab=myTurn?(P.phase==='lead'?'Your turn to lead! / તમારો વારો (લીડ)!':'Your turn! / તમારો વારો!')
+      :(me.out?'You are SAFE! / તમે સુરક્ષિત છો! &middot; ':'')+'Waiting for '+esc(P.players[P.turn].name)+'... / '+esc(P.players[P.turn].name)+' ની રાહ...';
+  }
+  $('turnLabel').innerHTML=lab;
+  if(P.over){
+    $('handArea').innerHTML=`<h2>&#127942; ${esc(P.over)} becomes THO!</h2><div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી</div>
+      <button onclick="location.href=location.href.split('?')[0]">Play again / ફરીથી રમો</button>`;
+  } else {
+    const hasLead=hand.some(c=>c.suit===P.leadSuit);
+    const sorted=[...hand].sort((a,b)=>SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)||b.value-a.value);
+    $('handArea').innerHTML=sorted.map(c=>{
+      const legal=myTurn&&(P.phase==='lead'?(!P.firstTrick||(c.suit==='S'&&c.rank==='A')):(!hasLead||c.suit===P.leadSuit));
+      return cardHtml(c,legal?'ok':'no');
+    }).join('');
+  }
+  $('playerList').innerHTML=P.players.map((p,i)=>
+    `<div class="row"><span>${esc(p.name)}${p.bot?' (Bot)':''}${i===you?' (you)':''}${i===P.turn&&!P.over?' &#9654;':''}</span>
+     <span>${p.out?'<b>SAFE / સુરક્ષિત</b>':p.n+' cards'}</span></div>`).join('');
+  $('log').innerHTML=P.log.map(l=>`<div>${l}</div>`).join('');
+}
+</script>
+</body>
+</html>
