@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THO - Multiplayer</title>
+<style>
+body{font-family:Arial,sans-serif;background:#0d3b24;color:#fff;margin:0;padding:14px;}
+h1{text-align:center;margin:6px 0 0;} .sub{text-align:center;font-size:13px;opacity:.85;margin:2px 0 12px;}
+.panel{background:#124d31;border-radius:10px;padding:14px;margin:10px auto;max-width:600px;}
+.card{width:44px;height:62px;border-radius:6px;background:#fff;color:#000;border:1px solid #999;display:inline-flex;flex-direction:column;justify-content:space-between;align-items:center;padding:3px 0;margin:3px;font-weight:bold;cursor:pointer;box-shadow:1px 1px 3px rgba(0,0,0,.4);vertical-align:top;}
+.card .rk{font-size:12px;line-height:1;} .card .sb{font-size:20px;line-height:1;}
+.card.red{color:#c62828;} .card.disabled{opacity:.35;cursor:not-allowed;} .card.plain{cursor:default;}
+.tw{display:inline-block;text-align:center;margin:0 2px;}
+input,select,textarea{padding:8px;border-radius:6px;border:none;margin:4px 0;font-family:inherit;}
+button,.btn{background:#f9a825;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;margin:4px 0;text-decoration:none;display:inline-block;}
+.btn.wa{background:#25d366;}
+.row{display:flex;justify-content:space-between;align-items:center;margin:4px 0;font-size:14px;}
+.small{font-size:12px;opacity:.85;} .seat{background:#0d3b24;border-radius:6px;padding:6px 10px;margin:3px 0;}
+.hr{border-top:1px solid #2c6b4a;margin:12px 0;} .code{font-size:32px;letter-spacing:4px;font-weight:bold;text-align:center;}
+#log{font-size:13px;max-height:110px;overflow-y:auto;background:#0a2e1c;padding:8px;border-radius:6px;}
+#popup{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:#fff59d;color:#000;padding:16px 22px;border-radius:14px;font-size:22px;font-weight:bold;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:99;display:none;text-align:center;max-width:85%;pointer-events:none;white-space:pre-line;}
+</style>
+</head>
+<body>
+<div id="popup"></div>
+<h1>&#127183; THO</h1>
+<div class="sub">Multiplayer card game &middot; મલ્ટિપ્લેયર પત્તાની રમત</div>
+
+<div class="panel" id="home" style="display:none;">
+  <input id="myName" maxlength="14" placeholder="Your name / તમારું નામ" style="width:90%;">
+  <div class="hr"></div>
+  <b>Create room / રૂમ બનાવો</b>
+  <div class="row"><span>Total players / કુલ ખેલાડીઓ</span><select id="numPlayers"></select></div>
+  <button onclick="createRoom()">Create Room / રૂમ બનાવો</button>
+  <div class="hr"></div>
+  <b>Join room / રૂમમાં જોડાઓ</b><br>
+  <input id="roomCode" maxlength="8" placeholder="Room code / કોડ" style="text-transform:uppercase;">
+  <button onclick="joinRoom()">Join / જોડાઓ</button>
+  <div class="small">Seats nobody joins are filled by bots. / જે બેઠકો ખાલી રહે તે બોટથી ભરાશે.</div>
+</div>
+
+<div class="panel" id="lobby" style="display:none;">
+  <div class="small" style="text-align:center;">Room code / રૂમ કોડ</div>
+  <div class="code" id="codeBig"></div>
+  <div style="text-align:center;">
+    <a class="btn wa" id="waBtn" target="_blank">&#128242; Share on WhatsApp / વોટ્સએપ પર શેર કરો</a>
+    <div class="small" id="linkTxt" style="word-break:break-all;"></div>
+  </div>
+  <div class="hr"></div>
+  <b>Players / ખેલાડીઓ</b>
+  <div id="lobbyList"></div>
+  <div class="small" style="margin-top:8px;">Change your name / તમારું નામ બદલો</div>
+  <input id="lobbyName" maxlength="14" style="width:60%;"> <button onclick="renameMe('lobbyName')">Update / બદલો</button>
+  <div class="hr"></div>
+  <button id="startBtn" onclick="startGame()" style="display:none;">Start Game / રમત શરૂ કરો</button>
+  <div class="small" id="waitMsg" style="display:none;">Waiting for the host to start... / હોસ્ટ રમત શરૂ કરે તેની રાહ...</div>
+</div>
+
+<div class="panel" id="game" style="display:none;">
+  <div class="panel" style="margin:0 0 10px;">
+    <div class="small">Current trick / ચાલુ ટ્રીક</div>
+    <div id="trickArea"></div>
+  </div>
+  <div class="row"><b id="turnLabel"></b></div>
+  <div id="renameRow" style="display:none;margin:6px 0;text-align:center;">
+    <input id="gameName" maxlength="14" style="width:55%;"> <button onclick="renameMe('gameName')">Update name / નામ બદલો</button>
+    <div class="small">Only until the first round ends / પહેલો રાઉન્ડ પૂરો થાય ત્યાં સુધી</div>
+  </div>
+  <div id="handArea" style="text-align:center;"></div>
+  <div class="panel"><div class="small">Players in turn order (1 &rarr; 2 &rarr; 3 ...) / ખેલાડીઓ (વારાનો ક્રમ)</div><div id="playerList"></div></div>
+  <div id="log"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+<script>
+const SUITS=['S','H','D','C'], SYM={S:'&spades;',H:'&hearts;',D:'&diams;',C:'&clubs;'};
+const RANKS=[['A',14],['K',13],['Q',12],['J',11],['10',10],['9',9],['8',8],['7',7],['6',6],['5',5],['4',4],['3',3],['2',2]];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'block':'none');
+const LOOP_LIMIT=4, LOOP_CARDS=10;
+const EMOJI=['😂','🤣','😜','🤪','😅','🙈','🤭','😝','🥴','🤡'];
+
+let db=null, room=null, myId=null, isHost=false, N=4, code='';
+let players=[],leader=0,turn=0,phase='lead',trick=[],leadSuit=null,firstTrick=true,busy=false,over=null,logs=[];
+let canRename=false,evt=null,evtId=0,lastEvt=0,lastTrickLen=0,popTimer=null,actx=null,pickStreak=0,discards=[],gameShown=false;
+
+/* ---------- Firebase config (built in - no setup needed by players) ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDl9sEi4_hVozp2i9yuVDqL32kQyZGk290",
+  authDomain: "gameoftho-c2592.firebaseapp.com",
+  databaseURL: "https://gameoftho-c2592-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "gameoftho-c2592",
+  storageBucket: "gameoftho-c2592.firebasestorage.app",
+  messagingSenderId: "353103299810",
+  appId: "1:353103299810:web:2f7565be1d7ee37ee78abb"
+};
+initFirebase(firebaseConfig);
+function initFirebase(cfg){
+  firebase.initializeApp(cfg);
+  db=firebase.database();
+  show('home');
+  for(let i=2;i<=25;i++){const o=document.createElement('option');o.value=o.text=i;if(i===4)o.selected=true;$('numPlayers').appendChild(o);}
+  const qp=new URLSearchParams(location.search).get('room'); if(qp)$('roomCode').value=qp.toUpperCase();
+}
+myId='p-'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+const myName=()=>($('myName').value.trim()||'Player').slice(0,14);
+
+/* ---------- lobby / room ---------- */
+function createRoom(){
+  isHost=true; N=+$('numPlayers').value;
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  code=Array.from({length:5},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  room=db.ref('rooms/'+code);
+  room.set({n:N,started:false,players:{[myId]:myName()},createdAt:Date.now()})
+    .catch(e=>alert('Could not create room / રૂમ બનાવી શકાયો નહીં:\n'+e.message));
+  attachRoomListener(); showLobby();
+}
+function joinRoom(){
+  code=$('roomCode').value.trim().toUpperCase(); if(!code)return;
+  isHost=false; room=db.ref('rooms/'+code);
+  room.once('value').then(snap=>{
+    const val=snap.val();
+    if(!val){alert('Room not found / રૂમ મળ્યો નહીં');return;}
+    if(val.started){alert('Game already started / રમત શરૂ થઈ ગઈ છે');return;}
+    room.child('players/'+myId).set(myName())
+      .catch(e=>alert('Could not join / જોડાઈ શકાયું નહીં:\n'+e.message));
+    attachRoomListener(); showLobby();
+  }).catch(e=>alert('Could not reach the server / સર્વર સુધી પહોંચી શકાયું નહીં:\n'+e.message));
+}
+function showLobby(){
+  show('lobby'); $('lobbyName').value=myName(); $('codeBig').innerText=code;
+  const link=location.href.split('?')[0].split('#')[0]+'?room='+code;
+  $('linkTxt').innerText=link;
+  $('waBtn').href='https://wa.me/?text='+encodeURIComponent('Join my THO card game! / મારી THO રમતમાં જોડાઓ!\nRoom code: '+code+'\n'+link);
+  $('startBtn').style.display=isHost?'inline-block':'none';
+  $('waitMsg').style.display=isHost?'none':'block';
+}
+function renderLobby(names,n){
+  $('lobbyList').innerHTML=names.map(x=>`<div class="seat">${esc(x)}</div>`).join('')+
+   `<div class="small">${names.length}/${n} joined &middot; ${Math.max(0,n-names.length)} bot(s) fill the rest / બાકીની બેઠકો બોટથી ભરાશે</div>`;
+}
+function renameMe(id){
+  const v=$(id).value.trim().slice(0,14); if(!v)return;
+  if(!players.length){ room.child('players/'+myId).set(v); }
+  else if(canRename){ room.child('moves').push({cid:myId,type:'rename',name:v}); }
+}
+function attachRoomListener(){
+  room.on('value',snap=>{
+    const val=snap.val(); if(!val)return;
+    N=val.n;
+    if(!val.started){ renderLobby(Object.values(val.players||{}),N); return; }
+    if(!gameShown){gameShown=true; show('game');}
+    if(!val.state) return;
+    try{
+      const st=val.state;
+      // Firebase drops null array entries (bot seats) and empty arrays entirely,
+      // so rebuild these defensively instead of assuming they stayed real arrays.
+      st.trick = Array.isArray(st.trick) ? st.trick : (st.trick ? Object.values(st.trick) : []);
+      st.log = Array.isArray(st.log) ? st.log : (st.log ? Object.values(st.log) : []);
+      const n=(st.players||[]).length;
+      let idx=-1;
+      for(let k=0;k<n;k++){ if(st.ids && st.ids[k]===myId){idx=k;break;} }
+      const hand=(val.hands&&val.hands[myId])||[];
+      render(st,hand,idx);
+    }catch(err){
+      alert('Display error / દેખાડવામાં ભૂલ:\n'+err.message);
+    }
+  }, e=>alert('Connection error / જોડાણ ભૂલ:\n'+e.message));
+  if(isHost){
+    room.child('moves').on('child_added',snap=>{
+      const d=snap.val(); const key=snap.key;
+      room.child('moves/'+key).remove();
+      const i=players.findIndex(p=>p.cid===d.cid); if(i<0)return;
+      if(d.type==='play') play(i,d.suit,d.rank);
+      else if(d.type==='rename'){
+        const v=String(d.name||'').trim().slice(0,14); if(!v)return;
+        const old=players[i].name; players[i].name=v;
+        addLog(esc(old)+' is now '+esc(v)+' / નામ બદલ્યું'); broadcast();
+      }
+    }, e=>alert('Moves listener error / ભૂલ:\n'+e.message));
+  }
+}
+
+/* ---------- audio ---------- */
+function audio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();}catch(e){}return actx;}
+function tone(f,dur,type,vol,delay){
+  const a=audio(); if(!a)return; const t=a.currentTime+(delay||0);
+  const o=a.createOscillator(),g=a.createGain(); o.type=type||'square'; o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(vol||.12,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+dur+.02);
+}
+const clickSnd=()=>tone(1000,.05,'square',.12);
+const oopsSnd=()=>{tone(400,.15,'sawtooth',.12,0);tone(300,.22,'sawtooth',.12,.15);};
+function showPopup(txt){const el=$('popup');el.textContent=txt;el.style.display='block';clearTimeout(popTimer);popTimer=setTimeout(()=>{el.style.display='none';},2600);}
+document.addEventListener('click',()=>audio());
+
+/* ---------- game engine (host only) ---------- */
+const nm=i=>'#'+(i+1)+' '+esc(players[i].name);
+function addLog(m){logs.unshift(m);logs=logs.slice(0,8);}
+function nextActive(from){const n=players.length;for(let k=1;k<=n;k++){const i=(from+k)%n;if(!players[i].out)return i;}return from;}
+
+function startGame(){
+  const deck=[]; SUITS.forEach(s=>RANKS.forEach(r=>deck.push({suit:s,rank:r[0],value:r[1]})));
+  shuffle(deck);
+  room.child('players').once('value').then(snap=>{
+    const lobbyPlayers=snap.val()||{};
+    const list=Object.entries(lobbyPlayers).map(([cid,name])=>({name,isBot:false,cid,hand:[],out:false}));
+    for(let i=list.length;i<N;i++)list.push({name:'Bot '+(i-list.length+1)+String.fromCharCode(65+i),isBot:true,cid:null,hand:[],out:false});
+    players=shuffle(list);
+    deck.forEach((c,i)=>players[i%players.length].hand.push(c));
+    leader=players.findIndex(p=>p.hand.some(c=>c.suit==='S'&&c.rank==='A'));
+    turn=leader;phase='lead';trick=[];leadSuit=null;firstTrick=true;busy=false;over=null;logs=[];
+    canRename=true;evt=null;pickStreak=0;discards=[];
+    addLog('Game started / રમત શરૂ થઈ');
+    room.update({started:true}).then(afterTurnSet)
+      .catch(e=>alert('Could not start game / રમત શરૂ કરી શકાઈ નહીં:\n'+e.message));
+  }).catch(e=>alert('Could not read lobby / લોબી વાંચી શકાઈ નહીં:\n'+e.message));
+}
+function pubState(){
+  return{ids:players.map(p=>p.cid),players:players.map(p=>({name:p.name,bot:p.isBot,out:p.out,n:p.hand.length})),
+    trick:trick.map(t=>({p:t.p,card:t.card})),turn,phase,leadSuit,firstTrick,busy,over,leader,canRename,evt,log:logs};
+}
+function broadcast(){
+  const P=pubState(); const handsObj={};
+  players.forEach(p=>{ if(p.cid) handsObj[p.cid]=p.hand; });
+  room.update({state:P, hands:handsObj})
+    .catch(e=>alert('Could not update game / રમત અપડેટ કરી શકાઈ નહીં:\n'+e.message));
+}
+function afterTurnSet(){ busy=false; broadcast(); if(!over&&players[turn].isBot)setTimeout(botMove,1700); }
+function botMove(){
+  if(over||busy||!players[turn]||!players[turn].isBot)return;
+  const p=players[turn]; let card;
+  if(phase==='lead'){ card=firstTrick?p.hand.find(c=>c.suit==='S'&&c.rank==='A'):p.hand.reduce((a,b)=>a.value<b.value?a:b); }
+  else { const suited=p.hand.filter(c=>c.suit===leadSuit); card=suited.length?suited.reduce((a,b)=>a.value<b.value?a:b):p.hand.reduce((a,b)=>a.value>b.value?a:b); }
+  play(turn,card.suit,card.rank);
+}
+function play(i,suit,rank){
+  if(over||busy||i!==turn)return;
+  const p=players[i], card=p.hand.find(c=>c.suit===suit&&c.rank===rank); if(!card)return;
+  if(phase==='lead'){ if(firstTrick&&!(suit==='S'&&rank==='A'))return; }
+  else if(suit!==leadSuit&&p.hand.some(c=>c.suit===leadSuit))return;
+  p.hand=p.hand.filter(c=>c!==card);
+  busy=true;
+  if(phase==='lead'){
+    trick=[{p:i,card}];leadSuit=suit;firstTrick=false;phase='follow';
+    addLog(nm(i)+' leads '+card.rank+SYM[card.suit]);
+    turn=nextActive(i); broadcast(); setTimeout(afterTurnSet,1000); return;
+  }
+  trick.push({p:i,card}); addLog(nm(i)+' plays '+card.rank+SYM[card.suit]); broadcast();
+  if(suit!==leadSuit){setTimeout(()=>resolve(true),1200);return;}
+  const nx=nextActive(i);
+  if(nx===leader){setTimeout(()=>resolve(false),1200);return;}
+  turn=nx; setTimeout(afterTurnSet,1000);
+}
+function topUp(alive){
+  const stacks={S:[],H:[],C:[],D:[]};
+  shuffle(discards).forEach(c=>stacks[c.suit].push(c));
+  const n=Math.min(LOOP_CARDS,Math.floor(discards.length/2));
+  pickStreak=0;
+  if(n<1){
+    const pool=shuffle(alive.flatMap(pl=>pl.hand));
+    alive.forEach(pl=>{pl.hand=[];}); pool.forEach((c,k)=>alive[k%2].hand.push(c));
+    evt.msg+='\n🔀 કાર્ડ ફરી ભળ્યા!'; evt.snd='oops';
+    addLog("<b>Loop detected - cards reshuffled / કાર્ડ ફરી ભળ્યા</b>"); return;
+  }
+  const order=['S','H','C','D'];
+  alive.forEach(pl=>{ for(let k=0,si=0;k<n&&si<400;si++){ const st=stacks[order[si%4]]; if(st.length){pl.hand.push(st.pop());k++;} } });
+  discards=[].concat(stacks.S,stacks.H,stacks.C,stacks.D);
+  evt.msg+='\n🎁 દરેકને '+n+' નવા પત્તા!'; evt.snd='oops';
+  addLog("<b>Endless loop! Each of the last two players gets "+n+" fresh cards / દરેકને "+n+" નવા પત્તા</b>");
+}
+function resolve(broke){
+  let best=trick[0]; trick.forEach(t=>{if(t.card.suit===leadSuit&&t.card.value>best.card.value)best=t;});
+  const w=best.p, breaker=trick[trick.length-1].p;
+  canRename=false; const parts=[]; let snd='ok';
+  if(broke){
+    parts.push(players[w].name+'ને ઠો મળ્યો! '+EMOJI[Math.floor(Math.random()*EMOJI.length)]); snd='oops';
+    players[w].hand.push(...trick.map(t=>t.card));
+    addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');
+  } else {
+    discards.push(...trick.map(t=>t.card));
+    parts.push(players[w].name+'નો હાથ ✋');
+    addLog("<b>"+nm(w)+"'s hand / "+esc(players[w].name)+"નો હાથ</b>");
+  }
+  trick=[];leadSuit=null;
+  players.forEach((pl,i)=>{ if(!pl.hand.length&&!pl.out){pl.out=true;parts.push(pl.name+' છૂટી ગયા! 🎉');addLog('<b>'+nm(i)+' is free! / '+esc(pl.name)+' છૂટી ગયા!</b>');} });
+  evt={id:++evtId,msg:parts.join('\n'),snd};
+  const alive=players.filter(pl=>!pl.out);
+  if(alive.length<=1){over=alive[0]?alive[0].name:'-';busy=false;broadcast();return;}
+  if(broke&&alive.length===2)pickStreak++; else pickStreak=0;
+  if(pickStreak>=LOOP_LIMIT)topUp(alive);
+  const starter=broke?breaker:w;
+  leader=players[starter].out?nextActive(starter):starter; turn=leader; phase='lead';
+  if(broke)addLog(nm(leader)+' leads next / આગળનો વારો');
+  broadcast(); setTimeout(afterTurnSet,1500);
+}
+
+/* ---------- rendering (everyone, incl. host) ---------- */
+function cardHtml(c,mode){
+  const red=(c.suit==='H'||c.suit==='D')?' red':'';
+  const cls='card'+red+(mode==='no'?' disabled':'')+(!mode?' plain':'');
+  const click=mode==='ok'?` onclick="sendPlay('${c.suit}','${c.rank}')"`:'';
+  return `<span class="${cls}"${click}><span class="rk">${c.rank}</span><span class="sb">${SYM[c.suit]}</span><span class="rk">${c.rank}</span></span>`;
+}
+function sendPlay(s,r){
+  if(isHost){ const i=players.findIndex(p=>p.cid===myId); play(i,s,r); }
+  else room.child('moves').push({cid:myId,type:'play',suit:s,rank:r});
+}
+function render(P,hand,you){
+  const me=P.players[you], myTurn=P.turn===you&&!P.busy&&!P.over;
+  const tag=i=>'#'+(i+1)+' '+esc(P.players[i].name);
+  if(P.trick.length>lastTrickLen)clickSnd(); lastTrickLen=P.trick.length;
+  if(P.evt&&P.evt.id!==lastEvt){lastEvt=P.evt.id;showPopup(P.evt.msg);if(P.evt.snd==='oops')oopsSnd(); else clickSnd();}
+  $('renameRow').style.display=(P.canRename&&!P.over)?'block':'none';
+  if(!$('gameName').dataset.init&&me){$('gameName').value=me.name;$('gameName').dataset.init='1';}
+  $('trickArea').innerHTML=P.trick.length?P.trick.map(t=>`<span class="tw"><span class="small">${tag(t.p)}</span><br>${cardHtml(t.card)}</span>`).join(''):'<span class="small">-</span>';
+  let lab='';
+  if(!P.over){
+    lab=myTurn?(P.phase==='lead'?'Your turn to lead! / તમારો વારો (લીડ)!':'Your turn! / તમારો વારો!')
+      :((me&&me.out)?'You are free! / તમે છૂટી ગયા! &middot; ':'')+'Waiting for '+tag(P.turn)+'... / '+tag(P.turn)+' ની રાહ...';
+  }
+  $('turnLabel').innerHTML=lab;
+  if(P.over){
+    $('handArea').innerHTML=`<h2>${['🤡','😅','🙈','😜','🍌'][[...P.over].reduce((a,c)=>a+c.charCodeAt(0),0)%5]} ${esc(P.over)} becomes THO!</h2>
+      <div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી<br>Better luck next time! / આવતી વખતે વધુ સારા નસીબ!</div>
+      <button onclick="location.href=location.href.split('?')[0]">Play again / ફરીથી રમો</button>`;
+  } else if(you>=0){
+    const hasLead=hand.some(c=>c.suit===P.leadSuit);
+    $('handArea').innerHTML=['S','H','C','D'].map(su=>{
+      const row=hand.filter(c=>c.suit===su).sort((a,b)=>b.value-a.value);
+      if(!row.length)return '';
+      return '<div>'+row.map(c=>{
+        const legal=myTurn&&(P.phase==='lead'?(!P.firstTrick||(c.suit==='S'&&c.rank==='A')):(!hasLead||c.suit===P.leadSuit));
+        return cardHtml(c,legal?'ok':'no');
+      }).join('')+'</div>';
+    }).join('');
+  }
+  $('playerList').innerHTML=P.players.map((p,i)=>
+    `<div class="row"><span>#${i+1} ${esc(p.name)}${p.bot?' (Bot)':''}${i===you?' (you)':''}${i===P.turn&&!P.over?' &#9654;':''}</span>
+     <span>${p.out?'<b>FREE / છૂટી ગયા</b>':p.n+' cards'}</span></div>`).join('');
+  $('log').innerHTML=P.log.map(l=>`<div>${l}</div>`).join('');
+}
+</script>
+</body>
+</html>
