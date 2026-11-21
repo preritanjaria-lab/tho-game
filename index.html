@@ -20,12 +20,10 @@ h1{text-align:center;margin:6px 0 0;} .sub{text-align:center;font-size:13px;opac
 .pip{position:absolute;transform:translate(-50%,-50%);font-size:var(--pp);line-height:1;}
 .pip.f{transform:translate(-50%,-50%) rotate(180deg);}
 .aceP{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:calc(var(--ch)*.42);line-height:1;}
-.court{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;}
-.court .fig{font-size:calc(var(--ch)*.44);line-height:1.1;}
-.court .fs{font-size:calc(var(--ch)*.16);line-height:1;margin-top:-2px;}
-.court.K{background:linear-gradient(160deg,#fff8e1 0%,#ffe082 55%,#fff 100%);}
-.court.Q{background:linear-gradient(160deg,#fce4ec 0%,#f8bbd0 55%,#fff 100%);}
-.court.J{background:linear-gradient(160deg,#e0f7fa 0%,#b2ebf2 55%,#fff 100%);}
+/* classic two-headed court card look: blue frame, yellow/green robes, red accents; suit-tinted */
+.court{position:absolute;inset:0;}
+.csvg{position:absolute;top:7%;bottom:7%;left:8%;right:8%;}
+.csvg svg{width:100%;height:100%;display:block;}
 .card.red{color:#d32f2f;} .card .pip.red,.card .aceP.red,.card .court.red .fig,.card .court.red .fs{color:#d32f2f;}
 .card.disabled{opacity:.35;cursor:not-allowed;} .card.plain{cursor:default;}
 .tw{display:inline-block;text-align:center;margin:0 3px;}
@@ -361,11 +359,106 @@ const TAB={
  10:[[.25,.08],[.75,.08],[.5,.22],[.25,.36],[.75,.36],[.25,.64],[.75,.64],[.5,.78],[.25,.92],[.75,.92]]
 };
 const FIG={J:'🤵',Q:'👸',K:'🤴'};
+const SUITC={S:'#263238',H:'#e53935',D:'#e64a19',C:'#1565c0'};
+function rosette(x,y,s){ /* flower like on the real queen card */
+  return '<g transform="translate('+x+' '+y+') scale('+s+')">'+
+   '<path d="M0 -6 L2 -2 L6 -4 L4 0 L8 2 L3 3 L4 7 L0 4 L-4 7 L-3 3 L-8 2 L-4 0 L-6 -4 L-2 -2 Z" fill="#f7c918" stroke="#c8a200" stroke-width=".5"/>'+
+   '<circle cx="0" cy="0" r="2" fill="#e53935"/>'+
+   '<path d="M-8 8 q8 4 16 0" fill="none" stroke="#29a3d4" stroke-width="1"/>'+
+  '</g>';
+}
+function queenHalf(sym,sc){ /* modeled on the shared Queen of Hearts photo */
+  return '<polygon points="30,12 64,12 50,40" fill="#f7c918"/>'+
+   '<polygon points="64,12 88,28 62,42" fill="#f2b705"/>'+
+   '<circle cx="55" cy="20" r="2.2" fill="#3aa63f"/><circle cx="62" cy="27" r="2.2" fill="#3aa63f"/><circle cx="49" cy="28" r="2.2" fill="#3aa63f"/>'+
+   '<path d="M22 54 Q38 22 66 16" fill="none" stroke="#29a3d4" stroke-width="4"/>'+
+   '<rect x="40" y="44" width="14" height="18" fill="#111" transform="rotate(38 47 53)"/>'+
+   '<rect x="36" y="48" width="6" height="14" fill="#e53935" transform="rotate(38 39 55)"/>'+
+   '<path d="M36 60 L48 76" stroke="#111" stroke-width="4"/>'+
+   '<path d="M48 46 L60 62" stroke="#e53935" stroke-width="2.6"/>'+
+   '<path d="M58 50 l4 4 l4 -4 l4 4 l-4 4 l4 4 l-4 4 l-4 -4 l-4 4 l-4 -4 l4 -4 z" fill="#fff" stroke="#29a3d4" stroke-width=".8"/>'+
+   '<ellipse cx="33" cy="46" rx="9.5" ry="12.5" fill="#fff" stroke="#29a3d4" stroke-width="2"/>'+
+   '<path d="M30.5 42 q1.5 3 0 6" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+   '<path d="M36.5 42 q1.5 2.4 0 4.4" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+   '<path d="M28 50 q5 2.6 10 0" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+   '<path d="M24 34 q9 -9 18 0 z" fill="#f7c918" stroke="#b8860b" stroke-width="1"/>'+
+   '<circle cx="33" cy="26.5" r="1.6" fill="#e53935"/>'+
+   rosette(78,22,1)+
+   '<text x="79" y="60" font-size="15" fill="'+sc+'" text-anchor="middle">'+sym+'</text>';
+}
+function placeholderHalf(sym,sc,rank){ /* placeholder until Queen/King photo designs arrive */
+  const head=
+    rank==='K'?'<path d="M24 33 l4 -9 l5 6 l5 -9 l5 9 l5 -6 l4 9 z" fill="#f7c918" stroke="#b8860b" stroke-width="1"/><circle cx="29" cy="26" r="1.1" fill="#e53935"/><circle cx="38" cy="25" r="1.1" fill="#e53935"/><circle cx="47" cy="26" r="1.1" fill="#e53935"/>':
+    '<path d="M23 34 q10 -11 20 0 l0 3 l-20 0 z" fill="#29a3d4" stroke="#1976a5" stroke-width="1"/>';
+  return '<polygon points="26,12 62,12 46,46" fill="#f7c918"/>'+
+    '<polygon points="62,12 88,30 60,46" fill="#f2b705"/>'+
+    '<circle cx="52" cy="21" r="2.2" fill="#3aa63f"/><circle cx="59" cy="28" r="2.2" fill="#3aa63f"/><circle cx="46" cy="29" r="2.2" fill="#3aa63f"/>'+
+    '<path d="M22 52 Q36 24 64 18" fill="none" stroke="#29a3d4" stroke-width="4"/>'+
+    '<path d="M70 24 L88 56" stroke="#111" stroke-width="4"/>'+
+    '<path d="M64 30 L84 62" stroke="#e53935" stroke-width="2.6"/>'+
+    '<ellipse cx="32" cy="45" rx="9.5" ry="12.5" fill="#fff" stroke="#29a3d4" stroke-width="2"/>'+
+    '<path d="M29.5 41 q1.5 3 0 6" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+    '<path d="M35.5 41 q1.5 2.4 0 4.4" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+    '<path d="M27 49 q5 2.6 10 0" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+    head+
+    '<text x="79" y="36" font-size="15" fill="'+sc+'" text-anchor="middle">'+sym+'</text>';
+}
+function kingHalf(sym,sc){ /* modeled on the shared King of Spades photo */
+  let dots='';
+  for(let i=0;i<6;i++)dots+='<circle cx="'+(34+i*10)+'" cy="15.5" r="2" fill="#3aa63f"/>';
+  return '<rect x="26" y="12" width="62" height="7" fill="#f7c918"/>'+dots+
+  '<path d="M30 20 h50" stroke="#29a3d4" stroke-width="2"/>'+
+  '<path d="M24 28 Q40 20 62 18" fill="none" stroke="#29a3d4" stroke-width="3" stroke-dasharray="2 2"/>'+
+  '<path d="M23 38 q11 9 19 3 l-2 14 q-9 4 -17 -3 z" fill="#bfe3f0" stroke="#29a3d4" stroke-width="1"/>'+
+  '<ellipse cx="32" cy="45" rx="9.5" ry="12.5" fill="#fff" stroke="#29a3d4" stroke-width="2"/>'+
+  '<path d="M29.5 41 q1.5 3 0 6" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+  '<path d="M35.5 41 q1.5 2.4 0 4.4" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+  '<path d="M27 49 q5 2.6 10 0" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+  '<path d="M24 34 l4 -8 l4 5 l5 -7 l5 7 l4 -5 l4 8 z" fill="#e53935" stroke="#b8860b" stroke-width="1"/>'+
+  '<circle cx="29" cy="28" r="1.2" fill="#f7c918"/><circle cx="42" cy="27.5" r="1.2" fill="#f7c918"/><circle cx="50" cy="28" r="1.2" fill="#f7c918"/>'+
+  '<rect x="6" y="49" width="10" height="16" transform="rotate(24 11 57)" fill="#e53935"/>'+
+  '<ellipse cx="56" cy="62" rx="17" ry="12" fill="none" stroke="#111" stroke-width="3"/>'+
+  '<ellipse cx="56" cy="62" rx="12" ry="8" fill="none" stroke="#f7c918" stroke-width="3"/>'+
+  '<circle cx="56" cy="62" r="3.5" fill="#f7c918"/>'+
+  '<text x="56" y="47" font-size="9" fill="'+sc+'" text-anchor="middle">'+sym+'</text>'+
+  '<path d="M74 40 L88 58" stroke="#e53935" stroke-width="3"/>'+
+  '<path d="M80 34 L92 52" stroke="#e53935" stroke-width="3"/>'+
+  '<path d="M68 66 q6 -4 12 0 q6 4 12 0" stroke="#3aa63f" stroke-width="2" fill="none"/>';
+}
+function jackHalf(sym,sc){ /* modeled on the shared Jack of Diamonds photo */
+  return '<polygon points="14,16 34,16 26,52" fill="#e53935"/>'+
+  '<rect x="19" y="22" width="4" height="16" transform="rotate(24 21 30)" fill="#fff"/>'+
+  '<rect x="25" y="22" width="4" height="16" transform="rotate(24 27 30)" fill="#fff"/>'+
+  '<text x="84" y="34" font-size="20" fill="'+sc+'" text-anchor="middle">'+sym+'</text>'+
+  '<path d="M30 38 q6 -9 12 -3 q-3 -9 6 -9 q7 0 5 9 q6 -5 9 2" stroke="#8bc34a" stroke-width="3" fill="none"/>'+
+  '<ellipse cx="70" cy="46" rx="9" ry="11" fill="#fff" stroke="#29a3d4" stroke-width="2"/>'+
+  '<path d="M71 41 q1.5 3 0 6" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+  '<path d="M65 41 q1.5 2.4 0 4.4" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+  '<path d="M64 49 q5 2.6 9 0" stroke="#29a3d4" stroke-width="1.3" fill="none"/>'+
+  '<path d="M36 70 L64 24" stroke="#f7c918" stroke-width="5"/>'+
+  '<path d="M36 24 L64 70" stroke="#29a3d4" stroke-width="5"/>'+
+  '<path d="M42 42 l8 10 l-4 3 l-8 -10 z" fill="#e53935"/>'+
+  '<path d="M48 36 l8 10 l-4 3 l-8 -10 z" fill="#e53935"/>'+
+  '<path d="M54 30 l8 10 l-4 3 l-8 -10 z" fill="#e53935"/>'+
+  '<path d="M38 66 h26" stroke="#111" stroke-width="2"/>';
+}
+function courtSvg(c){
+  const sc=SUITC[c.suit]||'#263238', sym=SYM[c.suit];
+  const half=c.rank==='Q'?queenHalf(sym,sc):(c.rank==='K'?kingHalf(sym,sc):jackHalf(sym,sc));
+  return '<svg viewBox="0 0 100 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'+
+    '<rect x="3" y="3" width="94" height="134" rx="4" fill="#fff" stroke="#29a3d4" stroke-width="2.5"/>'+
+    '<g>'+half+'</g>'+
+    '<g transform="matrix(1,0,0,-1,0,140)">'+half+'</g>'+
+    '<rect x="3" y="66" width="94" height="8" fill="#29a3d4"/>'+
+    '<circle cx="50" cy="70" r="4.5" fill="#f7c918" stroke="#b8860b"/>'+
+    '<circle cx="50" cy="70" r="1.8" fill="#e53935"/>'+
+    '</svg>';
+}
 function cardInner(c){
   const red=(c.suit==='H'||c.suit==='D')?' red':'';
   const sym=SYM[c.suit], v=VAL[c.rank]||0;
   const ci=`<span class="ci">${c.rank}<br>${sym}</span><span class="ci b">${c.rank}<br>${sym}</span>`;
-  if(FIG[c.rank]) return ci+`<span class="court ${c.rank}${red}"><span class="fig">${FIG[c.rank]}</span><span class="fs">${sym}</span></span>`;
+  if(FIG[c.rank]) return ci+`<span class="court c${c.suit}${red}"><span class="csvg">${courtSvg(c)}</span></span>`;
   if(v===14) return ci+`<span class="aceP${red}">${sym}</span>`;
   const pips=TAB[v].map(([x,y])=>`<span class="pip${y>.5?' f':''}${red}" style="left:${x*100}%;top:${y*100}%">${sym}</span>`).join('');
   return ci+`<span class="pips">${pips}</span>`;
@@ -379,6 +472,7 @@ function cardHtml(c,mode){
 function sendPlay(s,r){
   if(isHost){ const i=players.findIndex(p=>p.cid===myId); play(i,s,r); }
   else room.child('moves').push({cid:myId,type:'play',suit:s,rank:r});
+  setTimeout(()=>{try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){window.scrollTo(0,0);}},200);
 }
 function render(P,hand,you){
   const me=P.players[you], myTurn=P.turn===you&&!P.busy&&!P.over;
@@ -395,7 +489,7 @@ function render(P,hand,you){
   }
   $('turnLabel').innerHTML=lab;
   if(P.over){
-    $('handArea').innerHTML=`<h2>${['🤡','😅','🙈','😜','🍌'][[...P.over].reduce((a,c)=>a+c.charCodeAt(0),0)%5]} ${esc(P.over)} becomes THO!</h2>
+    $('handArea').innerHTML=`<h2>${EMOJI[Math.floor(Math.random()*EMOJI.length)]} ${esc(P.over)} becomes THO!</h2>
       <div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી<br>Better luck next time! / ફરી પ્રયત્ન કરશો!</div>
       <button onclick="location.href=location.href.split('?')[0]">Play again / ફરીથી રમો</button>`;
   } else if(you>=0){
@@ -416,4 +510,4 @@ function render(P,hand,you){
 }
 </script>
 </body>
-  </html>
+</html>
