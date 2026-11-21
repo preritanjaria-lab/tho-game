@@ -13,7 +13,7 @@ body{font-family:Arial,sans-serif;background:#0d3b24;color:#fff;margin:0;padding
 h1{text-align:center;margin:6px 0 0;} .sub{text-align:center;font-size:13px;opacity:.85;margin:2px 0 12px;}
 .panel{background:#124d31;border-radius:10px;padding:14px;margin:10px auto;max-width:600px;}
 .card{position:relative;width:var(--cw);height:var(--ch);border-radius:8px;background:#fff;color:#000;border:1px solid #999;display:inline-block;margin:3px;font-weight:bold;cursor:pointer;box-shadow:1px 1px 3px rgba(0,0,0,.4);vertical-align:top;overflow:hidden;}
-.card .ci{position:absolute;top:2px;left:3px;text-align:center;font-size:var(--rk);line-height:1.05;letter-spacing:0;}
+.card .ci{position:absolute;top:2px;left:3px;text-align:center;font-size:var(--rk);line-height:1.05;letter-spacing:0;background:rgba(255,255,255,.8);border-radius:3px;padding:1px;z-index:3;}
 .card .ci.b{top:auto;left:auto;bottom:2px;right:3px;transform:rotate(180deg);}
 .card .sb{font-size:var(--sb);line-height:1;}
 .pips{position:absolute;top:16%;bottom:16%;left:14%;right:14%;}
@@ -22,8 +22,11 @@ h1{text-align:center;margin:6px 0 0;} .sub{text-align:center;font-size:13px;opac
 .aceP{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:calc(var(--ch)*.42);line-height:1;}
 /* classic two-headed court card look: blue frame, yellow/green robes, red accents; suit-tinted */
 .court{position:absolute;inset:0;}
+.cimg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(1.55);transform-origin:center;}
+.ci{z-index:2;}
 .csvg{position:absolute;top:7%;bottom:7%;left:8%;right:8%;}
 .csvg svg{width:100%;height:100%;display:block;}
+.cimg{z-index:1;}
 .card.red{color:#d32f2f;} .card .pip.red,.card .aceP.red,.card .court.red .fig,.card .court.red .fs{color:#d32f2f;}
 .card.disabled{opacity:.35;cursor:not-allowed;} .card.plain{cursor:default;}
 .tw{display:inline-block;text-align:center;margin:0 3px;}
@@ -113,7 +116,7 @@ function withTimeout(promise, ms, label){
 
 const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'block':'none');
 const LOOP_LIMIT=4, LOOP_CARDS=10;
-const EMOJI=['😂','🤣','😜','🤪','😅','🤪','😒','😭','👎','🤦🏻‍♀️','👨‍🏫','🤷🏻‍♀️','🥀','🐸','🦴','🙍🏻‍♀️','🙍🏻‍♂️','🙅🏻‍♀️','🙆🏻‍♀️','🙆🏻','🐫','🤖','💩','🎃','🎭','🩴','❌️','🏴‍☠️'];
+const EMOJI=['😂','🤣','😜','🤪','😅','🤪','😒','😭','👎','🤦🏻‍♀️','👨‍🏫','🤷🏻‍♀️','🥀','🐸','🦴','🙍🏻‍♀️','🙍🏻‍♂️','🙅🏻‍♀️','🙆🏻‍♀️','🙆🏻','🐫','🤖','🎃','🎭','🩴','❌️','🏴‍☠️'];
 
 /* ---------- card size ---------- */
 const SIZES={S:{cw:'48px',ch:'68px',rk:'9px',sb:'22px',pp:'13px'},M:{cw:'64px',ch:'90px',rk:'11px',sb:'30px',pp:'17px'},L:{cw:'82px',ch:'116px',rk:'14px',sb:'40px',pp:'22px'}};
@@ -328,7 +331,7 @@ function resolve(broke){
     addLog('<b>'+nm(w)+' picks up '+trick.length+' cards / પત્તા ઉપાડ્યા</b>');
   } else {
     discards.push(...trick.map(t=>t.card));
-    parts.push(players[w].name+'નો હાથ ✋');
+    parts.push(players[w].name+'નો હાથ!');
     addLog("<b>"+nm(w)+"'s hand / "+esc(players[w].name)+"નો હાથ</b>");
   }
   trick=[];leadSuit=null;
@@ -359,6 +362,7 @@ const TAB={
  10:[[.25,.08],[.75,.08],[.5,.22],[.25,.36],[.75,.36],[.25,.64],[.75,.64],[.5,.78],[.25,.92],[.75,.92]]
 };
 const FIG={J:'🤵',Q:'👸',K:'🤴'};
+const CIMG={J:'jack.jpg',Q:'queen.jpg',K:'king.jpg'}; /* photo files placed next to index.html */
 const SUITC={S:'#263238',H:'#e53935',D:'#e64a19',C:'#1565c0'};
 function rosette(x,y,s){ /* flower like on the real queen card */
   return '<g transform="translate('+x+' '+y+') scale('+s+')">'+
@@ -488,7 +492,7 @@ function cardInner(c){
   const red=(c.suit==='H'||c.suit==='D')?' red':'';
   const sym=SYM[c.suit], v=VAL[c.rank]||0;
   const ci=`<span class="ci">${c.rank}<br>${sym}</span><span class="ci b">${c.rank}<br>${sym}</span>`;
-  if(FIG[c.rank]) return ci+`<span class="court c${c.suit}${red}"><span class="csvg">${courtSvg(c)}</span></span>`;
+  if(FIG[c.rank]) return ci+`<span class="court c${c.suit}${red}"><img class="cimg" src="${CIMG[c.rank]}" alt="${c.rank}" draggable="false"></span>`;
   if(v===14) return ci+`<span class="aceP${red}">${sym}</span>`;
   const pips=TAB[v].map(([x,y])=>`<span class="pip${y>.5?' f':''}${red}" style="left:${x*100}%;top:${y*100}%">${sym}</span>`).join('');
   return ci+`<span class="pips">${pips}</span>`;
