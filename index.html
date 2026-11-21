@@ -442,9 +442,39 @@ function jackHalf(sym,sc){ /* modeled on the shared Jack of Diamonds photo */
   '<path d="M54 30 l8 10 l-4 3 l-8 -10 z" fill="#e53935"/>'+
   '<path d="M38 66 h26" stroke="#111" stroke-width="2"/>';
 }
+function stdHalf(sym,sc,rank){ /* standard Hoyle/Bicycle-style bust: white face, suit-colored robe, gold crown/tiara/cap */
+  const parts=[];
+  if(rank==='J')parts.push('<path d="M64 14 L56 66" stroke="#8d99ae" stroke-width="2"/>'); /* halberd staff */
+  parts.push('<path d="M30 66 L70 66 L64 52 Q50 46 36 52 Z" fill="'+sc+'"/>'); /* robe */
+  parts.push('<path d="M36 52 Q50 46 64 52" fill="none" stroke="#f7c918" stroke-width="2"/>'); /* gold trim */
+  parts.push('<text x="50" y="63" font-size="9" fill="#f7c918" text-anchor="middle">'+sym+'</text>'); /* chest pip */
+  parts.push('<rect x="46" y="42" width="8" height="7" fill="#fff" stroke="'+sc+'"/>'); /* neck */
+  parts.push('<circle cx="50" cy="34" r="11" fill="#fff" stroke="'+sc+'" stroke-width="2"/>'); /* head */
+  if(rank==='K'){
+    parts.push('<path d="M41 25 l2.5 -9 l4 5.5 l2.5 -8 l2.5 8 l4 -5.5 l2.5 9 z" fill="#f7c918" stroke="#b8860b" stroke-width="1"/>');
+    parts.push('<circle cx="50" cy="22.5" r="1.4" fill="#e53935"/><circle cx="44" cy="23" r="1.1" fill="#e53935"/><circle cx="56" cy="23" r="1.1" fill="#e53935"/>');
+    parts.push('<path d="M39 31 a11 11 0 0 1 22 0" fill="none" stroke="'+sc+'" stroke-width="4"/>'); /* hair crown line */
+    parts.push('<path d="M50 37 q-4 -2 -6 1 M50 37 q4 -2 6 1" stroke="'+sc+'" stroke-width="1.4" fill="none"/>'); /* mustache */
+    parts.push('<path d="M48 44 q2 1.4 4 0" stroke="'+sc+'" stroke-width="1.2" fill="none"/>'); /* beard line */
+  } else if(rank==='Q'){
+    parts.push('<path d="M43 26 q7 -8 14 0 l0 -3 q-7 -6 -14 0 z" fill="#f7c918" stroke="#b8860b" stroke-width="1"/>');
+    parts.push('<circle cx="50" cy="22" r="1.5" fill="#e53935"/>');
+    parts.push('<path d="M39 33 a11 11 0 0 1 22 0 l1 11 q-3 3 -5 0 l0 -9 q-6 4 -13 4 l-1 5 q-2 3 -4 0 l1 -13" fill="'+sc+'" stroke="none"/>'); /* long hair */
+    parts.push('<circle cx="46" cy="34" r="1.1" fill="'+sc+'"/><circle cx="54" cy="34" r="1.1" fill="'+sc+'"/>');
+    parts.push('<path d="M47 41 q3 1.8 6 0" stroke="'+sc+'" stroke-width="1.2" fill="none"/>');
+  } else {
+    parts.push('<path d="M39 31 a11 11 0 0 1 22 0" fill="none" stroke="'+sc+'" stroke-width="3.5"/>'); /* cap band */
+    parts.push('<path d="M41 27 q9 -6 18 0 l0 3 q-9 -3 -18 0 z" fill="'+sc+'"/>'); /* cap */
+    parts.push('<path d="M59 25 q6 -3 7 -10" stroke="#3aa63f" stroke-width="2" fill="none"/>'); /* feather */
+    parts.push('<circle cx="46" cy="34" r="1.1" fill="'+sc+'"/><circle cx="54" cy="34" r="1.1" fill="'+sc+'"/>');
+    parts.push('<path d="M50 35 l0 3" stroke="'+sc+'" stroke-width="1.2"/>');
+    parts.push('<path d="M47 41 q3 1.8 6 0" stroke="'+sc+'" stroke-width="1.2" fill="none"/>');
+  }
+  return parts.join('');
+}
 function courtSvg(c){
   const sc=SUITC[c.suit]||'#263238', sym=SYM[c.suit];
-  const half=c.rank==='Q'?queenHalf(sym,sc):(c.rank==='K'?kingHalf(sym,sc):jackHalf(sym,sc));
+  const half=stdHalf(sym,sc,c.rank);
   return '<svg viewBox="0 0 100 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'+
     '<rect x="3" y="3" width="94" height="134" rx="4" fill="#fff" stroke="#29a3d4" stroke-width="2.5"/>'+
     '<g>'+half+'</g>'+
