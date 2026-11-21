@@ -115,7 +115,7 @@ function withTimeout(promise, ms, label){
 
 const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'block':'none');
 const LOOP_LIMIT=4, LOOP_CARDS=10;
-const EMOJI=['😂','🤣','😜','🤪','😅','🙈','🤭','😝','🥴','🤡'];
+const EMOJI=['😂','🤣','😜','🤪','😅','🤪','😒','😭','👎','🤦🏻‍♀️','👨‍🏫','🤷🏻‍♀️','🥀','🐸','🦴','🙍🏻‍♀️','🙍🏻‍♂️','🙅🏻‍♀️','🙆🏻‍♀️','🙆🏻','🐫','🤖','💩','🎃','🎭','🩴','❌️','🏴‍☠️'];
 
 /* ---------- card size ---------- */
 const SIZES={S:{cw:'48px',ch:'68px',rk:'9px',sb:'22px',pp:'13px'},M:{cw:'64px',ch:'90px',rk:'11px',sb:'30px',pp:'17px'},L:{cw:'82px',ch:'116px',rk:'14px',sb:'40px',pp:'22px'}};
@@ -395,9 +395,9 @@ function render(P,hand,you){
   }
   $('turnLabel').innerHTML=lab;
   if(P.over){
-    $('handArea').innerHTML=`<h2>${['🤡','😅','🙈','😜','🍌',🤪,'😒','😭','👎','🤦🏻‍♀️','🤷🏻‍♀️','🙆🏻','🙆🏻‍♀️','🙅🏻‍♀️','🙍🏻‍♂️','🙍🏻‍♀️','🦴','🐸','🥀','🤖','💩','🎃','🎭','🩴','❌️','🏴‍☠️'][[...P.over].reduce((a,c)=>a+c.charCodeAt(0),0)%26]} ${esc(P.over)} becomes THO!</h2>
-      <div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી<br>Better luck next time! / ફરી પ્રયત્ન કરશો !</div>
-  <button onclick="location.href=location.href.split('?')[0]">Play again / ફરીથી રમો</button>`;
+    $('handArea').innerHTML=`<h2>${['🤡','😅','🙈','😜','🍌'][[...P.over].reduce((a,c)=>a+c.charCodeAt(0),0)%5]} ${esc(P.over)} becomes THO!</h2>
+      <div class="sub">${esc(P.over)} THO બન્યા! રમત પૂરી<br>Better luck next time! / ફરી પ્રયત્ન કરશો!</div>
+      <button onclick="location.href=location.href.split('?')[0]">Play again / ફરીથી રમો</button>`;
   } else if(you>=0){
     const hasLead=hand.some(c=>c.suit===P.leadSuit);
     $('handArea').innerHTML=['S','H','C','D'].map(su=>{
@@ -416,4 +416,4 @@ function render(P,hand,you){
 }
 </script>
 </body>
-</html>
+  </html>
