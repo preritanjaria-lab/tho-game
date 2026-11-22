@@ -20,7 +20,8 @@ h1{text-align:center;margin:6px 0 0;} .sub{text-align:center;font-size:13px;opac
 .pip{position:absolute;transform:translate(-50%,-50%);font-size:var(--pp);line-height:1;}
 .pip.f{transform:translate(-50%,-50%) rotate(180deg);}
 .aceP{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:calc(var(--ch)*.42);line-height:1;text-align:center;}
-.aceP .crk{display:block;font-size:calc(var(--ch)*.28);line-height:1;margin-bottom:calc(var(--ch)*.06);}
+.aceP .crk{display:block;font-size:calc(var(--ch)*.28);line-height:1;margin-bottom:calc(var(--ch)*.04);}
+.aceP .cword{display:block;font-size:calc(var(--cw)*.15);font-weight:bold;letter-spacing:1px;line-height:1;margin-bottom:calc(var(--ch)*.04);}
 /* classic two-headed court card look: blue frame, yellow/green robes, red accents; suit-tinted */
 .court{position:absolute;inset:0;}
 .cimg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(1.55);transform-origin:center;}
@@ -117,7 +118,7 @@ function withTimeout(promise, ms, label){
 
 const show=id=>['home','lobby','game'].forEach(x=>$(x).style.display=x===id?'block':'none');
 const LOOP_LIMIT=4, LOOP_CARDS=10;
-const EMOJI=['😂','🤣','😜','🤪','😅','🤪','😒','😭','👎','🤦🏻‍♀️','👨‍🏫','🤷🏻‍♀️','🥀','🐸','🦴','🙍🏻‍♀️','🙍🏻‍♂️','🙅🏻‍♀️','🙆🏻‍♀️','🙆🏻','🐫','🤖','🎃','🎭','🩴','❌️','🏴‍☠️'];
+const EMOJI=['😂','🤣','😜','🤪','😅','🤪','😒','😭','👎','🤦🏻‍♀️','👨‍🏫','🤷🏻‍♀️','🥀','🐸','🦴','🙍🏻‍♀️','🙍🏻‍♂️','🙅🏻‍♀️','🙆🏻‍♀️','🙆🏻','🐫','🤖','🎃','🎭','🩴','❌️','🏴‍☠️','🐖'];
 
 /* ---------- card size ---------- */
 const SIZES={S:{cw:'48px',ch:'68px',rk:'9px',sb:'22px',pp:'13px'},M:{cw:'64px',ch:'90px',rk:'11px',sb:'30px',pp:'17px'},L:{cw:'82px',ch:'116px',rk:'14px',sb:'40px',pp:'22px'}};
@@ -363,6 +364,7 @@ const TAB={
  10:[[.25,.08],[.75,.08],[.5,.22],[.25,.36],[.75,.36],[.25,.64],[.75,.64],[.5,.78],[.25,.92],[.75,.92]]
 };
 const FIG={J:'🤵',Q:'👸',K:'🤴'};
+const FIGNAME={K:'KING',Q:'QUEEN',J:'JACK'};
 const SUITC={S:'#263238',H:'#e53935',D:'#e64a19',C:'#1565c0'};
 function rosette(x,y,s){ /* flower like on the real queen card */
   return '<g transform="translate('+x+' '+y+') scale('+s+')">'+
@@ -492,7 +494,7 @@ function cardInner(c){
   const red=(c.suit==='H'||c.suit==='D')?' red':'';
   const sym=SYM[c.suit], v=VAL[c.rank]||0;
   const ci=`<span class="ci">${c.rank}<br>${sym}</span><span class="ci b">${c.rank}<br>${sym}</span>`;
-  if(FIG[c.rank]) return ci+`<span class="aceP${red}"><span class="crk">${c.rank}</span>${sym}</span>`;
+  if(FIG[c.rank]) return ci+`<span class="aceP${red}"><span class="crk">${c.rank}</span><span class="cword">${FIGNAME[c.rank]}</span>${sym}</span>`;
   if(v===14) return ci+`<span class="aceP${red}">${sym}</span>`;
   const pips=TAB[v].map(([x,y])=>`<span class="pip${y>.5?' f':''}${red}" style="left:${x*100}%;top:${y*100}%">${sym}</span>`).join('');
   return ci+`<span class="pips">${pips}</span>`;
@@ -544,4 +546,4 @@ function render(P,hand,you){
 }
 </script>
 </body>
-</html>
+  </html>
